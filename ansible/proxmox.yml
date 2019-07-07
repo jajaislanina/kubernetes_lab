@@ -1,0 +1,4 @@
+- name: proxmox
+  hosts: all
+  roles:
+    - qemu-agent

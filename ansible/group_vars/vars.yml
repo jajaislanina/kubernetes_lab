@@ -1,0 +1,4 @@
+all_users: [
+  {"username": "ilpe", "key": "{{ playbook_dir }}/../keys/ilpe.key.pub"},
+  {"username": "ansible", "key": "{{ playbook_dir }}/../keys/ansible.key.pub"}
+]

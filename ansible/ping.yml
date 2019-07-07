@@ -1,0 +1,6 @@
+- name: Ping
+  hosts: all
+  remote_user: ansible
+  tasks:
+    - name: Ping the target
+      ping:

@@ -1,0 +1,114 @@
+  - name: Install packages that allow apt to be used over HTTPS
+    apt:
+      name: "{{ apt_packages }}"
+      state: present
+      update_cache: yes
+
+  - name: Add an apt signing key for Docker
+    apt_key:
+      url: "{{ docker_pgp_key }}"
+      state: present
+
+  - name: Add apt repository for stable version
+    apt_repository:
+      repo: deb [arch=amd64] {{ docker_apt_reposity }}
+      state: present
+
+  - name: Install docker and its dependecies
+    apt: 
+      name: "{{ docker_packages }}"
+      state: present
+      update_cache: yes
+    notify:
+      - docker status
+
+  - name: Add ansoble user to docker group
+    user:
+      name: ansible
+      group: docker
+  
+  - name: Remove swapfile from /etc/fstab
+    mount:
+      name: "{{ item }}"
+      fstype: swap
+      state: absent
+    with_items: "{{ swap_items }}"
+
+  - name: Disable swap
+    command: swapoff -a
+    when: ansible_swaptotal_mb > 0
+    
+  - name: Add an apt signing key for Kubernetes
+    apt_key:
+      url: "{{ k8s_pgp_key }}"
+      state: present
+
+  - name: Adding apt repository for Kubernetes
+    apt_repository:
+      repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+      filename: kubernetes.list
+
+  - name: Install Kubernetes binaries
+    apt: 
+      name: "{{ k8s_packages }}"
+      state: present
+      update_cache: yes
+
+  - name: set environmental variable for kubelet
+    lineinfile:
+      dest: "/etc/environment"
+      state: present
+      regexp: "^KUBELET_EXTRA_ARGS"
+      line: "KUBELET_EXTRA_ARGS=--node-ip={{ advertise_address }}"
+  
+  - name: Check if Kubernetes has already been initialized.
+    stat:
+      path: /etc/kubernetes/admin.conf
+    register: kubernetes_init_stat
+
+  - name: Initialize the Kubernetes cluster using kubeadm
+    shell: |
+      kubeadm init --apiserver-advertise-address={{ advertise_address }} \
+      --apiserver-cert-extra-sans={{ advertise_address }} \
+      --pod-network-cidr={{ pod_network }}
+    when: not kubernetes_init_stat.stat.exists
+      
+  - name: Create kube directory
+    file:
+      path: /home/ansible/.kube
+      state: directory
+
+  - name: Copy admin conf
+    copy:
+      src: /etc/kubernetes/admin.conf
+      dest: /home/ansible/.kube/admin.conf
+      force: yes
+      remote_src: true
+      owner: ansible
+      group: ansible
+
+  - name: set environmental variable
+    lineinfile:
+      dest: "/etc/environment"
+      state: present
+      regexp: "^KUBECONFIG"
+      line: "KUBECONFIG=/home/ansible/.kube/admin.conf"
+
+  - name: Copy network plugin config
+    template:
+      src: kube-flannel.yml
+      dest: /tmp/kube-flannel.yml
+
+  - name: Install network plugin
+    become: false
+    shell: kubectl create -f /tmp/kube-flannel.yml
+    environment: 
+      KUBECONFIG: /home/ansible/.kube/admin.conf
+
+  - name: Generate join command
+    command: kubeadm token create --print-join-command
+    register: join_command
+
+  - name: Copy join command to local file
+    local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"

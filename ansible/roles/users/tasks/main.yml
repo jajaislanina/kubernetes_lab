@@ -1,0 +1,36 @@
+- name: Create users
+  user:
+    name: "{{ item.username }}"
+    shell: /bin/bash
+  with_items: "{{ all_users }}"
+  tags: [create_user]
+
+- name: Create .ssh directory
+  become: yes
+  become_user: root
+  file:
+    dest: "/home/{{ item.username }}/.ssh"
+    owner: "{{ item.username }}"
+    group: "{{ item.username }}"
+    state: directory
+  with_items: "{{ all_users }}"
+  tags: [create_user]
+
+- name: Copy ssh key
+  become: yes
+  become_user: root
+  copy:
+    src: "{{ item.key }}"
+    dest: "/home/{{item.username}}/.ssh/authorized_keys"
+    owner: "{{ item.username }}"
+    group: "{{ item.username }}"
+  with_items: "{{ all_users }}"
+  tags: [create_user]
+
+- name: Enable root access
+  lineinfile:
+    path: /etc/sudoers
+    regexp: "^{{ item.username }}"
+    line: "{{ item.username }}    ALL=(ALL:ALL) NOPASSWD: ALL"
+  with_items: "{{ all_users }}"
+  tags: [create_user]

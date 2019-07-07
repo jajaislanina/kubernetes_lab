@@ -1,0 +1,6 @@
+  - name: Install proxmox packages
+    apt:
+      name: "{{ item }}"
+      state: present
+      update_cache: yes
+    with_items: [qemu-guest-agent]

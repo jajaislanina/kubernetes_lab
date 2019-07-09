@@ -13,6 +13,7 @@ Vagrant.configure("2") do |config|
 		cfg.vm.hostname = "ansible"
 		cfg.vm.network "public_network"
 		cfg.vm.provision :shell, path: "scripts/install-ansible.sh"
+		cfg.vm.provision :shell, path: "scripts/install-kubectl.sh"
 		cfg.vm.provider "virtualbox" do |v|
 		  v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]            
 		  v.memory = 2048
